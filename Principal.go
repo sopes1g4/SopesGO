@@ -10,6 +10,9 @@ import (
   "math"
   "encoding/json"
   "github.com/shirou/gopsutil/mem"
+    "io/ioutil"
+    "strings"
+    "strconv"
 )
 type JsonMemoria struct {
   Total uint64
@@ -40,7 +43,13 @@ func HomePage(w http.ResponseWriter, r *http.Request){
 func totalCpu(w http.ResponseWriter, r *http.Request) {  
   vmStat,err := cpu.Percent(0,false);
   vmStat2,err := mem.VirtualMemory()
-  jsonMemoria := JsonMemoria{bToMb(vmStat2.Total),math.Floor(vmStat2.UsedPercent*100)/100,math.Floor(vmStat[0]*100)/100 }
+ //-------------------------------------------------------------------------------
+   var archivoMemoria = ObtenerTextoArchivo("/proc/meminfo")
+   var memoriaTotal int = ObtenerLinea(archivoMemoria,0)
+   var memoriaConsumida int =memoriaTotal - ObtenerLinea(archivoMemoria,2)
+   var porcentajeConsumo float64 = float64(memoriaConsumida)*100/float64(memoriaTotal)
+//------------------------------------------------------------------------------------
+  jsonMemoria := JsonMemoria{bToMb(vmStat2.Total),math.Floor(porcentajeConsumo*100)/100,math.Floor(vmStat[0]*100)/100 }
   js, err := json.Marshal(jsonMemoria) 
   _=err
   w.Write(js)
@@ -77,4 +86,53 @@ func receiveAjax(w http.ResponseWriter, r *http.Request) {
 }
 func bToMb(b uint64) uint64 {
     return b / 1024 / 1024
+}
+
+
+//--------------------------------------------------------
+func ObtenerTextoArchivo(ruta string) string{
+    dat, err := ioutil.ReadFile(ruta)
+    check(err)
+   return string(dat)
+}
+
+func ObtenerLinea(cad string, posicion int) int{
+  lines := strings.Split(cad, "\n")
+  for i, line := range lines {
+    if i == posicion {
+      //fmt.Println(line)
+      return obtenerNumero(line)
+    }
+  }
+  return -1
+}
+
+func ObtenerLineaEstado(cad string, posicion int) string{
+  lines := strings.Split(cad, "\n")
+  for i, line := range lines {
+    if i == posicion {
+      //fmt.Println(line)
+      array := strings.Split(line, " ")
+      estado := strings.Replace( array[0], "State:  ","",1)
+      return estado
+    }
+  }
+  return ""
+}
+
+func obtenerNumero(cad string) int{
+  lines := strings.Split(cad, " ")
+  for _, line := range lines {
+    if _, err := strconv.Atoi(line); err == nil {
+      i1, _ := strconv.Atoi(line)
+    return i1
+    }
+  }
+  return -1
+}
+
+func check(e error) {
+    if e != nil {
+        panic(e)
+    }
 }
